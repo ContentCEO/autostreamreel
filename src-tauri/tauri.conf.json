@@ -4,8 +4,6 @@
   "version": "0.1.0",
   "identifier": "com.controlcenter.app",
   "build": {
-    "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build",
     "frontendDist": "../public",
     "devUrl": "http://localhost:3000"
   },
@@ -22,7 +20,6 @@
         "decorations": false,
         "alwaysOnTop": false,
         "transparent": false,
-        "url": "http://localhost:3000/",
         "userAgent": "ControlCenter/0.1.0 (Tauri Desktop)"
       }
     ],
@@ -35,6 +32,12 @@
     "category": "Productivity",
     "shortDescription": "Personal command center.",
     "longDescription": "Single-owner desktop command center for running multiple businesses with an AI team.",
-    "copyright": "© 2026"
+    "copyright": "© 2026",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
+    ]
   }
 }
