@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createBrowserClient } from "@supabase/ssr";
+import { useRouter } from "next/navigation";
 
 function getBrowserSupabase() {
   return createBrowserClient(
@@ -15,18 +16,34 @@ export default function LoginPage({
 }: {
   searchParams: { error?: string };
 }) {
+  const router = useRouter();
+  const [mode, setMode] = useState<"password" | "magic">("password");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [sent, setSent]   = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy]   = useState(false);
 
-  async function submit(e: React.FormEvent) {
+  async function submitPassword(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    setError(null); setBusy(true);
+    const supabase = getBrowserSupabase();
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    setBusy(false);
+    if (error) { setError(error.message); return; }
+    router.push("/cc");
+    router.refresh();
+  }
+
+  async function submitMagic(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null); setBusy(true);
     const supabase = getBrowserSupabase();
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: { emailRedirectTo: `${location.origin}/auth/callback` },
     });
+    setBusy(false);
     if (error) setError(error.message);
     else setSent(true);
   }
@@ -43,25 +60,46 @@ export default function LoginPage({
           </div>
         )}
 
-        {sent ? (
+        <div className="flex gap-1 mb-4 text-xs">
+          <button
+            onClick={() => { setMode("password"); setSent(false); setError(null); }}
+            className={`px-2 py-1 rounded-md border ${mode === "password" ? "border-accent-500 text-accent-300 bg-accent-500/10" : "border-ink-800 text-ink-400"}`}
+          >Password</button>
+          <button
+            onClick={() => { setMode("magic"); setSent(false); setError(null); }}
+            className={`px-2 py-1 rounded-md border ${mode === "magic" ? "border-accent-500 text-accent-300 bg-accent-500/10" : "border-ink-800 text-ink-400"}`}
+          >Magic link</button>
+        </div>
+
+        {sent && mode === "magic" ? (
           <p className="text-sm text-ink-200">
             Check <span className="font-medium text-accent-400">{email}</span> for a magic link.
           </p>
         ) : (
-          <form onSubmit={submit} className="space-y-4">
+          <form onSubmit={mode === "password" ? submitPassword : submitMagic} className="space-y-4">
             <label className="block">
               <span className="text-sm text-ink-300">Email</span>
               <input
-                type="email"
-                value={email}
+                type="email" required value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
                 className="input mt-1"
                 placeholder="you@example.com"
               />
             </label>
+            {mode === "password" && (
+              <label className="block">
+                <span className="text-sm text-ink-300">Password</span>
+                <input
+                  type="password" required value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="input mt-1"
+                />
+              </label>
+            )}
             {error && <p className="text-sm text-danger-500">{error}</p>}
-            <button type="submit" className="btn-primary w-full">Send magic link</button>
+            <button type="submit" disabled={busy} className="btn-primary w-full">
+              {busy ? "…" : mode === "password" ? "Sign in" : "Send magic link"}
+            </button>
           </form>
         )}
       </div>
