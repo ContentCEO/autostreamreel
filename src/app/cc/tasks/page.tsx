@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { relativeTime } from "@/lib/utils";
+import { TaskRowActions } from "@/components/TaskRowActions";
 
 export const dynamic = "force-dynamic";
 
@@ -24,10 +25,11 @@ export default async function TasksPage() {
                 <div className="text-sm font-medium truncate">{t.title}</div>
                 {t.details && <div className="text-xs text-ink-500 truncate">{t.details}</div>}
               </div>
-              <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-3 text-xs shrink-0">
                 <span className="badge bg-ink-800 text-ink-300">P{t.priority}</span>
                 <span className="badge bg-ink-800 text-ink-300">{t.status}</span>
                 {t.due_at && <span className="text-ink-500">{relativeTime(t.due_at)}</span>}
+                <TaskRowActions id={t.id} status={t.status} />
               </div>
             </li>
           ))}

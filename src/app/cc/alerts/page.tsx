@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { relativeTime } from "@/lib/utils";
+import { AlertRowActions } from "@/components/AlertRowActions";
 
 export const dynamic = "force-dynamic";
 
@@ -22,13 +23,14 @@ export default async function AlertsPage() {
           {data.map((a) => (
             <li key={a.id} className="card p-3">
               <div className="flex items-center justify-between gap-3">
-                <div>
+                <div className="min-w-0">
                   <div className="font-medium text-sm">{a.title}</div>
-                  {a.body && <div className="text-xs text-ink-400">{a.body}</div>}
+                  {a.body && <div className="text-xs text-ink-400 whitespace-pre-wrap">{a.body}</div>}
                 </div>
-                <div className="flex items-center gap-2 text-xs">
+                <div className="flex items-center gap-2 text-xs shrink-0">
                   <span className={a.severity === "critical" ? "badge bg-danger-500/20 text-danger-500" : a.severity === "warn" ? "badge bg-warn-500/20 text-warn-500" : "badge bg-ink-700 text-ink-300"}>{a.severity}</span>
                   <span className="text-ink-500">{relativeTime(a.created_at)}</span>
+                  <AlertRowActions id={a.id} resolved={Boolean(a.resolved_at)} />
                 </div>
               </div>
             </li>
