@@ -62,6 +62,9 @@ jobs:
       - name: Install node deps
         run: npm ci
 
+      - name: Generate Tauri icon bundle
+        run: npx --yes @tauri-apps/cli@^2 icon src-tauri/icons/source.png --output src-tauri/icons
+
       - name: Build Tauri
         uses: tauri-apps/tauri-action@v0
         env:
