@@ -7,6 +7,7 @@ import { TakeoverBoot } from "@/components/TakeoverBoot";
 import { BriefingOnOpen } from "@/components/BriefingOnOpen";
 import { CriticalTakeover } from "@/components/CriticalTakeover";
 import { StatusBar } from "@/components/StatusBar";
+import { SearchPalette } from "@/components/SearchPalette";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function CCLayout({ children }: { children: React.ReactNode
       <TakeoverBoot />
       <BriefingOnOpen />
       <CriticalTakeover />
+      <SearchPalette />
     </div>
   );
 }

@@ -29,11 +29,11 @@ export default async function BusinessesPage({
         <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {businesses.map((b) => (
             <li key={b.id} className="card p-4 flex items-center justify-between gap-3">
-              <div className="min-w-0">
+              <Link href={`/cc/businesses/${b.id}`} className="min-w-0 flex-1 hover:text-accent-400">
                 <div className="font-medium truncate">{b.name}</div>
                 <div className="text-xs text-ink-500">{b.industry ?? "—"}</div>
-              </div>
-              <Link href={`/cc/agents?business_id=${b.id}`} className="text-sm text-accent-400 hover:underline">View team →</Link>
+              </Link>
+              <Link href={`/cc/agents?business_id=${b.id}`} className="text-sm text-ink-400 hover:text-ink-200">Team →</Link>
             </li>
           ))}
         </ul>
