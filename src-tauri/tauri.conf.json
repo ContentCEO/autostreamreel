@@ -1,0 +1,40 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Control Center",
+  "version": "0.1.0",
+  "identifier": "com.controlcenter.app",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../public",
+    "devUrl": "http://localhost:3000"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Control Center",
+        "width": 1600,
+        "height": 1000,
+        "minWidth": 1280,
+        "minHeight": 800,
+        "resizable": true,
+        "fullscreen": true,
+        "decorations": false,
+        "alwaysOnTop": false,
+        "transparent": false,
+        "url": "http://localhost:3000/",
+        "userAgent": "ControlCenter/0.1.0 (Tauri Desktop)"
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "publisher": "Owner",
+    "category": "Productivity",
+    "shortDescription": "Personal command center.",
+    "longDescription": "Single-owner desktop command center for running multiple businesses with an AI team.",
+    "copyright": "© 2026"
+  }
+}

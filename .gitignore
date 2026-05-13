@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+.env
+.env.local
+.env*.local
+.DS_Store
+*.log
+*.tsbuildinfo
+src-tauri/target
+src-tauri/Cargo.lock
