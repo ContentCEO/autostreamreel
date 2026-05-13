@@ -4,8 +4,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { isOwnerEmail } from "@/lib/owner";
 import { generateBriefing } from "@/lib/briefing";
 
-// GET  /api/briefing      -> latest briefing (or generate if older than 30m)
-// POST /api/briefing      -> always regenerate
+// GET  /api/briefing      -> latest briefing (or generate if older than 30m).
+//                            Returns { body: null } if there is nothing to brief on yet.
+// POST /api/briefing      -> always regenerate.
 export async function GET() {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -13,6 +14,13 @@ export async function GET() {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
   const admin = createAdminClient();
+
+  // Skip entirely if the workspace has no businesses yet — the briefing would
+  // just be a paragraph about nothing, and the first-run welcome handles UX.
+  const { count: bizCount } = await admin
+    .from("businesses").select("id", { count: "exact", head: true });
+  if (!bizCount) return NextResponse.json({ body: null, empty: true });
+
   const { data } = await admin
     .from("briefings")
     .select("id,body,created_at")

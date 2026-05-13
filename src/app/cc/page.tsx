@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AlertTriangle, Briefcase, Building2, Calendar, PhoneOutgoing, Sparkles, Target, Users } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { formatCents, relativeTime } from "@/lib/utils";
+import { FirstRunWelcome } from "@/components/FirstRunWelcome";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,10 @@ export default async function Dashboard() {
   ]);
 
   const mrrTotal = (clients.data ?? []).reduce((s, c) => s + (c.mrr_cents ?? 0), 0);
+
+  if (!businesses.data?.length) {
+    return <FirstRunWelcome />;
+  }
 
   return (
     <div className="space-y-6">
