@@ -1,11 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { relativeTime } from "@/lib/utils";
+import { OutboundControls } from "@/components/OutboundControls";
+import { PermissionToggles } from "@/components/PermissionToggles";
+import { listPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function OutboundPage() {
   const supabase = createClient();
-  const [{ data: scheduled }, { data: log }] = await Promise.all([
+  const [{ data: scheduled }, { data: log }, { data: businesses }, permissions] = await Promise.all([
     supabase
       .from("outbound_schedule")
       .select("id,channel,target_kind,scheduled_at,status,script,agent_id")
@@ -15,16 +18,24 @@ export default async function OutboundPage() {
       .select("id,channel,direction,body,created_at")
       .order("created_at", { ascending: false })
       .limit(20),
+    supabase.from("businesses").select("id,name").order("created_at"),
+    listPermissions(),
   ]);
+
+  const outboundPerms = permissions.filter((p) => p.key.startsWith("outbound."));
 
   return (
     <div className="space-y-6">
       <header>
         <h1 className="text-2xl font-semibold">Outbound</h1>
         <p className="text-sm text-ink-400">
-          The autonomous call/text squad. <span className="text-warn-500">Heads up:</span> live dialing requires Twilio credentials and US TCPA / consent compliance — every outbound row records who and when. Scripts are AI-drafted, you can override before they go.
+          The autonomous call/text squad. Every outbound row records who and when.
+          Scripts are AI-drafted and you can override before they go.
         </p>
       </header>
+
+      <OutboundControls businesses={businesses ?? []} />
+      <PermissionToggles initial={outboundPerms} />
 
       <section>
         <h2 className="text-xs uppercase tracking-widest text-ink-500 mb-2">Scheduled</h2>

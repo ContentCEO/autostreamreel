@@ -1,5 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { DEPARTMENT_LABEL, TIER_LABEL, type AgentDepartment, type AgentTier } from "@/lib/types";
+import { DispatcherControls } from "@/components/DispatcherControls";
+import { PermissionToggles } from "@/components/PermissionToggles";
+import { listPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
@@ -16,7 +19,8 @@ export default async function AgentsPage({
     .order("department")
     .order("name");
   if (searchParams.business_id) q = q.eq("business_id", searchParams.business_id);
-  const { data } = await q;
+  const [{ data }, allPerms] = await Promise.all([q, listPermissions()]);
+  const autoPerms = allPerms.filter((p) => p.key === "agents.autonomous");
 
   type Row = NonNullable<typeof data>[number];
   const byDept = new Map<string, Row[]>();
@@ -32,6 +36,9 @@ export default async function AgentsPage({
         <h1 className="text-2xl font-semibold">Team</h1>
         <p className="text-sm text-ink-400">Your org chart. Click any agent to see what they&apos;re working on.</p>
       </header>
+
+      <DispatcherControls />
+      <PermissionToggles initial={autoPerms} />
 
       {!data?.length && (
         <p className="text-ink-400 text-sm">No agents yet — create a business to seed the org chart.</p>

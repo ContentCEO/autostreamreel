@@ -4,6 +4,9 @@ import { isOwnerEmail } from "@/lib/owner";
 import { Sidebar } from "@/components/Sidebar";
 import { JarvisPanel } from "@/components/JarvisPanel";
 import { TakeoverBoot } from "@/components/TakeoverBoot";
+import { BriefingOnOpen } from "@/components/BriefingOnOpen";
+import { CriticalTakeover } from "@/components/CriticalTakeover";
+import { StatusBar } from "@/components/StatusBar";
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +21,12 @@ export default async function CCLayout({ children }: { children: React.ReactNode
       <Sidebar email={user.email ?? null} />
       <main className="flex-1 min-w-0 flex flex-col">
         <div className="flex-1 overflow-y-auto px-6 py-6">{children}</div>
+        <StatusBar />
       </main>
       <JarvisPanel />
       <TakeoverBoot />
+      <BriefingOnOpen />
+      <CriticalTakeover />
     </div>
   );
 }

@@ -1,4 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
+import { AdAccountConnect } from "@/components/AdAccountConnect";
+import { PermissionToggles } from "@/components/PermissionToggles";
+import { listPermissions } from "@/lib/permissions";
+import { relativeTime } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -11,22 +15,48 @@ const PLATFORMS: { id: string; label: string; note: string }[] = [
   { id: "linkedin",   label: "LinkedIn Ads",note: "LinkedIn Campaign Manager" },
 ];
 
-export default async function AdAccountsPage() {
+export default async function AdAccountsPage({
+  searchParams,
+}: {
+  searchParams: { connected?: string; error?: string };
+}) {
   const supabase = createClient();
-  const { data } = await supabase
-    .from("ad_accounts")
-    .select("id,platform,account_label,status,last_synced_at,business_id");
+  const [{ data: accounts }, { data: businesses }, permissions] = await Promise.all([
+    supabase
+      .from("ad_accounts")
+      .select("id,platform,account_label,status,last_synced_at,business_id"),
+    supabase.from("businesses").select("id,name").order("created_at"),
+    listPermissions(),
+  ]);
 
-  const byPlatform = new Map<string, typeof data>();
-  for (const a of data ?? []) {
+  const adPerms = permissions.filter((p) => p.key === "ads.write");
+
+  const byPlatform = new Map<string, typeof accounts>();
+  for (const a of accounts ?? []) {
     if (!byPlatform.has(a.platform)) byPlatform.set(a.platform, []);
     byPlatform.get(a.platform)!.push(a);
   }
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">Ad accounts</h1>
-      <p className="text-sm text-ink-400">Connect each platform once per business. OAuth flows land in milestone 2.</p>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Ad accounts</h1>
+        <p className="text-sm text-ink-400">Connect each platform per business. Writes are gated by the kill switch below.</p>
+      </div>
+
+      {searchParams.connected && (
+        <div className="card p-3 text-sm border-success-500/30 bg-success-500/10 text-success-300">
+          Connected {searchParams.connected}.
+        </div>
+      )}
+      {searchParams.error && (
+        <div className="card p-3 text-sm border-danger-500/30 bg-danger-500/10 text-danger-300">
+          {decodeURIComponent(searchParams.error)}
+        </div>
+      )}
+
+      <AdAccountConnect platforms={PLATFORMS} businesses={businesses ?? []} />
+      <PermissionToggles initial={adPerms} />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {PLATFORMS.map((p) => {
@@ -45,7 +75,10 @@ export default async function AdAccountsPage() {
               {connected.length > 0 && (
                 <ul className="mt-3 space-y-1 text-sm">
                   {connected.map((a) => (
-                    <li key={a!.id} className="text-ink-300">{a!.account_label}</li>
+                    <li key={a!.id} className="flex items-center justify-between">
+                      <span className="text-ink-300">{a!.account_label}</span>
+                      <span className="text-xs text-ink-500">{relativeTime(a!.last_synced_at)}</span>
+                    </li>
                   ))}
                 </ul>
               )}
