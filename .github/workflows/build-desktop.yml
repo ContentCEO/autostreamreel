@@ -1,0 +1,85 @@
+name: Build desktop installers
+
+# Builds the Tauri desktop shell for macOS, Windows, and Linux on demand.
+# Triggered manually from the Actions tab ("Run workflow") so installers can
+# be downloaded as artifacts without producing a release every push.
+#
+# The shell loads the URL set in the CONTROL_CENTER_URL repo variable (or
+# the workflow_dispatch input override), so deploy the web app to Vercel
+# first and put that URL in: Settings → Secrets and variables → Actions →
+# Variables → New repository variable → CONTROL_CENTER_URL.
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_url:
+        description: "URL the desktop app loads (overrides CONTROL_CENTER_URL variable)"
+        required: false
+        type: string
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            target: "aarch64-apple-darwin"
+          - platform: macos-latest
+            target: "x86_64-apple-darwin"
+          - platform: ubuntu-22.04
+            target: ""
+          - platform: windows-latest
+            target: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "./src-tauri -> target"
+
+      - name: Linux deps
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install node deps
+        run: npm ci
+
+      - name: Build Tauri
+        uses: tauri-apps/tauri-action@v0
+        env:
+          CONTROL_CENTER_URL: ${{ inputs.app_url || vars.CONTROL_CENTER_URL || 'http://localhost:3000' }}
+        with:
+          args: ${{ matrix.target != '' && format('--target {0}', matrix.target) || '' }}
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: control-center-${{ matrix.platform }}${{ matrix.target != '' && format('-{0}', matrix.target) || '' }}
+          path: |
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.app.tar.gz
+            src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app.tar.gz
+            src-tauri/target/release/bundle/**/*.msi
+            src-tauri/target/release/bundle/**/*.exe
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+          if-no-files-found: ignore
