@@ -13,6 +13,9 @@ const INSERT_COLUMNS: Record<Kind, string[]> = {
   meetings:  ["business_id", "title", "with_name", "starts_at", "ends_at", "location", "agenda", "notes"],
 };
 
+// Updates allow the same columns as inserts.
+const UPDATE_COLUMNS = INSERT_COLUMNS;
+
 const REQUIRED: Record<Kind, string[]> = {
   clients:   ["name"],
   customers: ["name"],
@@ -35,6 +38,14 @@ export function pickInsert(kind: Kind, raw: Record<string, unknown>): {
   return { ok: true, row };
 }
 
+export function pickUpdate(kind: Kind, raw: Record<string, unknown>): Record<string, unknown> {
+  const row: Record<string, unknown> = {};
+  for (const col of UPDATE_COLUMNS[kind]) {
+    if (raw[col] !== undefined) row[col] = raw[col] === "" ? null : raw[col];
+  }
+  return row;
+}
+
 export async function insertRecord(
   supabase: SupabaseClient,
   kind: Kind,
@@ -45,4 +56,27 @@ export async function insertRecord(
   const { data, error } = await supabase.from(kind).insert(picked.row).select("id").single();
   if (error) return { error: error.message };
   return { id: (data as { id: string }).id };
+}
+
+export async function updateRecord(
+  supabase: SupabaseClient,
+  kind: Kind,
+  id: string,
+  raw: Record<string, unknown>,
+): Promise<{ ok: true } | { error: string }> {
+  const row = pickUpdate(kind, raw);
+  if (Object.keys(row).length === 0) return { error: "no allowed fields to update" };
+  const { error } = await supabase.from(kind).update(row).eq("id", id);
+  if (error) return { error: error.message };
+  return { ok: true };
+}
+
+export async function deleteRecord(
+  supabase: SupabaseClient,
+  kind: Kind,
+  id: string,
+): Promise<{ ok: true } | { error: string }> {
+  const { error } = await supabase.from(kind).delete().eq("id", id);
+  if (error) return { error: error.message };
+  return { ok: true };
 }

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCents } from "@/lib/utils";
 import { QuickAdd } from "@/components/QuickAdd";
@@ -59,7 +60,9 @@ export default async function ClientsPage() {
             <tbody className="divide-y divide-ink-800">
               {data.map((c) => (
                 <tr key={c.id}>
-                  <td className="px-3 py-2 font-medium">{c.name}</td>
+                  <td className="px-3 py-2 font-medium">
+                    <Link href={`/cc/clients/${c.id}`} className="hover:text-accent-400">{c.name}</Link>
+                  </td>
                   <td className="px-3 py-2 text-ink-300">{c.contact_name ?? "—"}<div className="text-xs text-ink-500">{c.email ?? c.phone ?? ""}</div></td>
                   <td className="px-3 py-2"><span className="badge bg-ink-800 text-ink-300">{c.status}</span></td>
                   <td className="px-3 py-2 text-right">{formatCents(c.mrr_cents)}</td>

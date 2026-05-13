@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCents } from "@/lib/utils";
 import { QuickAdd } from "@/components/QuickAdd";
@@ -43,7 +44,7 @@ export default async function CustomersPage() {
           {data.map((c) => (
             <li key={c.id} className="card p-4 space-y-2">
               <div>
-                <div className="font-medium">{c.name}</div>
+                <Link href={`/cc/customers/${c.id}`} className="font-medium hover:text-accent-400">{c.name}</Link>
                 <div className="text-xs text-ink-500">{c.email ?? c.phone ?? "—"}</div>
                 <div className="text-xs text-ink-400 mt-2">LTV: {formatCents(c.ltv_cents)}</div>
               </div>

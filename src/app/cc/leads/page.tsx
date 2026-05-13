@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { formatCents, relativeTime } from "@/lib/utils";
 import { LEAD_STATUS_LABEL } from "@/lib/types";
@@ -65,7 +66,7 @@ export default async function LeadsPage() {
               {data.map((l) => (
                 <tr key={l.id}>
                   <td className="px-3 py-2">
-                    <div className="font-medium">{l.name}</div>
+                    <Link href={`/cc/leads/${l.id}`} className="font-medium hover:text-accent-400">{l.name}</Link>
                     <div className="text-xs text-ink-500">{l.email ?? l.phone ?? ""}</div>
                   </td>
                   <td className="px-3 py-2 text-ink-300">{l.source ?? "—"}</td>
