@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { DEPARTMENT_LABEL, TIER_LABEL, type AgentDepartment, type AgentTier } from "@/lib/types";
 import { DispatcherControls } from "@/components/DispatcherControls";
@@ -49,15 +50,15 @@ export default async function AgentsPage({
           <h2 className="text-xs uppercase tracking-widest text-ink-500">{DEPARTMENT_LABEL[dept as AgentDepartment] ?? dept}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {agents.map((a) => (
-              <article key={a.id} className="card p-3">
+              <Link key={a.id} href={`/cc/agents/${a.id}`} className="card p-3 block hover:border-ink-700 transition">
                 <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium">{a.name}</div>
-                    <div className="text-xs text-ink-500">{a.role}</div>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{a.name}</div>
+                    <div className="text-xs text-ink-500 truncate">{a.role}</div>
                   </div>
                   <span className={tierBadge(a.tier as AgentTier)}>{TIER_LABEL[a.tier as AgentTier]}</span>
                 </div>
-              </article>
+              </Link>
             ))}
           </div>
         </section>

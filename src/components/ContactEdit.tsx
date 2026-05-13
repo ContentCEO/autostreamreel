@@ -16,11 +16,12 @@ interface Props {
   id: string;
   endpoint: string;        // e.g. /api/clients/<id>
   listHref: string;        // navigated to after delete
-  initial: Record<string, string | number | null>;
+  initial: Record<string, string | number | null | boolean>;
   fields: Field[];
+  canDelete?: boolean;     // default true; set false for records with refs (e.g. agents)
 }
 
-export function ContactEdit({ id, endpoint, listHref, initial, fields }: Props) {
+export function ContactEdit({ id, endpoint, listHref, initial, fields, canDelete = true }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -86,9 +87,11 @@ export function ContactEdit({ id, endpoint, listHref, initial, fields }: Props) 
         <button onClick={() => setOpen(true)} className="btn-ghost text-xs inline-flex items-center gap-1">
           <Pencil size={12} /> Edit
         </button>
-        <button onClick={remove} disabled={busy} className="btn-ghost text-xs inline-flex items-center gap-1 text-danger-400">
-          <Trash2 size={12} /> Delete
-        </button>
+        {canDelete && (
+          <button onClick={remove} disabled={busy} className="btn-ghost text-xs inline-flex items-center gap-1 text-danger-400">
+            <Trash2 size={12} /> Delete
+          </button>
+        )}
       </div>
     );
   }
