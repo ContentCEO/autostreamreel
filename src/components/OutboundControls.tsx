@@ -5,8 +5,13 @@ import { PhoneOutgoing, MessageSquare, Mail, PlayCircle } from "lucide-react";
 
 interface Business { id: string; name: string }
 
-export function OutboundControls({ businesses }: { businesses: Business[] }) {
-  const [bizId, setBizId] = useState<string>(businesses[0]?.id ?? "");
+interface Props {
+  businesses: Business[];
+  fixedBusinessId?: string;  // when set, the business selector is hidden
+}
+
+export function OutboundControls({ businesses, fixedBusinessId }: Props) {
+  const [bizId, setBizId] = useState<string>(fixedBusinessId ?? businesses[0]?.id ?? "");
   const [channel, setChannel] = useState<"sms" | "call" | "email">("sms");
   const [cadence, setCadence] = useState(7);
   const [count, setCount] = useState(4);
@@ -39,11 +44,13 @@ export function OutboundControls({ businesses }: { businesses: Business[] }) {
   return (
     <div className="card p-4 space-y-3">
       <div className="text-sm font-medium">Run the call/text squad</div>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
-        <select className="input" value={bizId} onChange={(e) => setBizId(e.target.value)}>
-          {businesses.length === 0 && <option value="">No businesses yet</option>}
-          {businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+      <div className={`grid grid-cols-1 ${fixedBusinessId ? "md:grid-cols-4" : "md:grid-cols-5"} gap-2`}>
+        {!fixedBusinessId && (
+          <select className="input" value={bizId} onChange={(e) => setBizId(e.target.value)}>
+            {businesses.length === 0 && <option value="">No businesses yet</option>}
+            {businesses.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+        )}
         <div className="flex gap-1">
           <ChanBtn icon={MessageSquare}    label="SMS"   value="sms"   active={channel} on={setChannel} />
           <ChanBtn icon={PhoneOutgoing}    label="Call"  value="call"  active={channel} on={setChannel} />

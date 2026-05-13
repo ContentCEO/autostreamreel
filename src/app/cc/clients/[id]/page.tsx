@@ -4,6 +4,7 @@ import { formatCents } from "@/lib/utils";
 import { ContactDetailLayout } from "@/components/ContactDetailLayout";
 import { ContactEdit } from "@/components/ContactEdit";
 import { OneOffOutbound } from "@/components/OneOffOutbound";
+import { ContactAgentDispatch } from "@/components/ContactAgentDispatch";
 import { listPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export default async function ClientDetail({ params }: { params: { id: string } 
   ]);
   if (!client) notFound();
 
-  const [{ data: business }, { data: messages }, { data: outbound }] = await Promise.all([
+  const [{ data: business }, { data: messages }, { data: outbound }, { data: agents }] = await Promise.all([
     client.business_id
       ? supabase.from("businesses").select("name").eq("id", client.business_id).maybeSingle()
       : Promise.resolve({ data: null as { name: string } | null }),
@@ -28,6 +29,9 @@ export default async function ClientDetail({ params }: { params: { id: string } 
       .select("id,channel,status,scheduled_at,script")
       .eq("target_kind", "client").eq("target_id", client.id)
       .order("scheduled_at", { ascending: false }).limit(20),
+    client.business_id
+      ? supabase.from("agents").select("id,name,role").eq("business_id", client.business_id).eq("is_active", true).in("department", ["customer_success", "sales"]).order("tier").order("name")
+      : Promise.resolve({ data: [] as { id: string; name: string; role: string }[] }),
   ]);
 
   const canSms   = perms.find((p) => p.key === "outbound.sms")?.enabled   ?? false;
@@ -93,6 +97,11 @@ export default async function ClientDetail({ params }: { params: { id: string } 
             targetKind="client"
             targetId={client.id}
             canSms={canSms} canCall={canCall} canEmail={canEmail}
+          />
+          <ContactAgentDispatch
+            contactKind="client"
+            contactName={client.name}
+            agents={agents ?? []}
           />
         </>
       }

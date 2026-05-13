@@ -4,6 +4,7 @@ import { formatCents } from "@/lib/utils";
 import { ContactDetailLayout } from "@/components/ContactDetailLayout";
 import { ContactEdit } from "@/components/ContactEdit";
 import { OneOffOutbound } from "@/components/OneOffOutbound";
+import { ContactAgentDispatch } from "@/components/ContactAgentDispatch";
 import { listPermissions } from "@/lib/permissions";
 import { LEAD_STATUS_LABEL } from "@/lib/types";
 
@@ -17,7 +18,7 @@ export default async function LeadDetail({ params }: { params: { id: string } })
   ]);
   if (!lead) notFound();
 
-  const [{ data: business }, { data: messages }, { data: outbound }] = await Promise.all([
+  const [{ data: business }, { data: messages }, { data: outbound }, { data: agents }] = await Promise.all([
     lead.business_id
       ? supabase.from("businesses").select("name").eq("id", lead.business_id).maybeSingle()
       : Promise.resolve({ data: null as { name: string } | null }),
@@ -29,6 +30,9 @@ export default async function LeadDetail({ params }: { params: { id: string } })
       .select("id,channel,status,scheduled_at,script")
       .eq("target_kind", "lead").eq("target_id", lead.id)
       .order("scheduled_at", { ascending: false }).limit(20),
+    lead.business_id
+      ? supabase.from("agents").select("id,name,role").eq("business_id", lead.business_id).eq("is_active", true).eq("department", "sales").order("tier").order("name")
+      : Promise.resolve({ data: [] as { id: string; name: string; role: string }[] }),
   ]);
 
   const canSms   = perms.find((p) => p.key === "outbound.sms")?.enabled   ?? false;
@@ -96,6 +100,11 @@ export default async function LeadDetail({ params }: { params: { id: string } })
             targetKind="lead"
             targetId={lead.id}
             canSms={canSms} canCall={canCall} canEmail={canEmail}
+          />
+          <ContactAgentDispatch
+            contactKind="lead"
+            contactName={lead.name}
+            agents={agents ?? []}
           />
         </>
       }

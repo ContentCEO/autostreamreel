@@ -4,6 +4,7 @@ import { ChevronLeft, Sparkles, Briefcase, Users, Target, AlertTriangle, Calenda
 import { createClient } from "@/lib/supabase/server";
 import { formatCents, relativeTime } from "@/lib/utils";
 import { LEAD_STATUS_LABEL } from "@/lib/types";
+import { OutboundControls } from "@/components/OutboundControls";
 
 export const dynamic = "force-dynamic";
 
@@ -142,6 +143,11 @@ export default async function BusinessDetail({ params }: { params: { id: string 
             ))}
           </ul>
         </Card>
+      </section>
+
+      <section>
+        <h2 className="text-xs uppercase tracking-widest text-ink-500 mb-2">Schedule check-ins for this business</h2>
+        <OutboundControls businesses={[{ id: business.id, name: business.name }]} fixedBusinessId={business.id} />
       </section>
 
       {business.notes && (

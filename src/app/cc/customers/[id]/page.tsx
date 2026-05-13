@@ -4,6 +4,7 @@ import { formatCents } from "@/lib/utils";
 import { ContactDetailLayout } from "@/components/ContactDetailLayout";
 import { ContactEdit } from "@/components/ContactEdit";
 import { OneOffOutbound } from "@/components/OneOffOutbound";
+import { ContactAgentDispatch } from "@/components/ContactAgentDispatch";
 import { listPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +17,7 @@ export default async function CustomerDetail({ params }: { params: { id: string 
   ]);
   if (!customer) notFound();
 
-  const [{ data: business }, { data: messages }, { data: outbound }] = await Promise.all([
+  const [{ data: business }, { data: messages }, { data: outbound }, { data: agents }] = await Promise.all([
     customer.business_id
       ? supabase.from("businesses").select("name").eq("id", customer.business_id).maybeSingle()
       : Promise.resolve({ data: null as { name: string } | null }),
@@ -28,6 +29,9 @@ export default async function CustomerDetail({ params }: { params: { id: string 
       .select("id,channel,status,scheduled_at,script")
       .eq("target_kind", "customer").eq("target_id", customer.id)
       .order("scheduled_at", { ascending: false }).limit(20),
+    customer.business_id
+      ? supabase.from("agents").select("id,name,role").eq("business_id", customer.business_id).eq("is_active", true).eq("department", "customer_success").order("tier").order("name")
+      : Promise.resolve({ data: [] as { id: string; name: string; role: string }[] }),
   ]);
 
   const canSms   = perms.find((p) => p.key === "outbound.sms")?.enabled   ?? false;
@@ -84,6 +88,11 @@ export default async function CustomerDetail({ params }: { params: { id: string 
             targetKind="customer"
             targetId={customer.id}
             canSms={canSms} canCall={canCall} canEmail={canEmail}
+          />
+          <ContactAgentDispatch
+            contactKind="customer"
+            contactName={customer.name}
+            agents={agents ?? []}
           />
         </>
       }
