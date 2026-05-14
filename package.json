@@ -1,6 +1,6 @@
 {
   "name": "control-center",
-  "version": "0.1.0",
+  "version": "1.2.0",
   "private": true,
   "description": "Personal command center — your own Jarvis for running multiple businesses.",
   "scripts": {

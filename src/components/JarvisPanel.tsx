@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Sparkles, Mic, MicOff } from "lucide-react";
+import { Send, Sparkles, Mic, MicOff, Monitor } from "lucide-react";
 import { speak, listenOnce, isListenSupported } from "@/lib/speech";
 import { VoiceToggle } from "@/components/VoiceToggle";
+import { ComputerUsePanel } from "@/components/ComputerUsePanel";
+import { isDesktop } from "@/lib/desktop";
 
 interface Msg { role: "user" | "assistant"; content: string }
 
@@ -14,12 +16,30 @@ export function JarvisPanel() {
   const [input, setInput] = useState("");
   const [busy, setBusy]   = useState(false);
   const [listening, setListening] = useState(false);
+  const [computerOpen, setComputerOpen] = useState(false);
+  const [showTakeover, setShowTakeover] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stopRef   = useRef<{ stop: () => void } | null>(null);
+
+  useEffect(() => { setShowTakeover(isDesktop()); }, []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
+
+  // Mirror spoken-utterance turns from ContinuousJarvis into the panel.
+  useEffect(() => {
+    function onTurn(e: Event) {
+      const d = (e as CustomEvent<{ user: string; assistant: string }>).detail;
+      setMessages((cur) => [
+        ...cur,
+        { role: "user", content: d.user },
+        { role: "assistant", content: d.assistant },
+      ]);
+    }
+    window.addEventListener("cc:jarvis-turn", onTurn);
+    return () => window.removeEventListener("cc:jarvis-turn", onTurn);
+  }, []);
 
   async function send(text: string) {
     const next = [...messages, { role: "user" as const, content: text }];
@@ -72,10 +92,20 @@ export function JarvisPanel() {
 
   return (
     <aside className="hidden lg:flex w-96 shrink-0 border-l border-ink-800 bg-ink-900/40 flex-col">
-      <header className="px-4 py-3 border-b border-ink-800 flex items-center gap-2">
+      <header className="px-4 py-3 border-b border-ink-800 flex items-center gap-2 flex-wrap">
         <Sparkles size={14} className="text-accent-400" />
         <div className="text-sm font-medium">Jarvis</div>
-        <span className="ml-2 badge bg-success-500/20 text-success-500">online</span>
+        <span className="badge bg-success-500/20 text-success-500">online</span>
+        {showTakeover && (
+          <button
+            type="button"
+            onClick={() => setComputerOpen(true)}
+            title="Computer Use — let Jarvis drive this Mac"
+            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-ink-800 text-ink-400 hover:border-accent-500/40 hover:text-accent-300"
+          >
+            <Monitor size={12} /> Take over
+          </button>
+        )}
         <div className="ml-auto"><VoiceToggle /></div>
       </header>
 
@@ -108,6 +138,7 @@ export function JarvisPanel() {
         />
         <button className="btn-primary" disabled={busy}><Send size={14} /></button>
       </form>
+      {computerOpen && <ComputerUsePanel onClose={() => setComputerOpen(false)} />}
     </aside>
   );
 }

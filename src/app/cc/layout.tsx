@@ -8,6 +8,8 @@ import { BriefingOnOpen } from "@/components/BriefingOnOpen";
 import { CriticalTakeover } from "@/components/CriticalTakeover";
 import { StatusBar } from "@/components/StatusBar";
 import { SearchPalette } from "@/components/SearchPalette";
+import { ContinuousJarvis } from "@/components/ContinuousJarvis";
+import { JarvisAutopilot } from "@/components/JarvisAutopilot";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,8 @@ export default async function CCLayout({ children }: { children: React.ReactNode
       <BriefingOnOpen />
       <CriticalTakeover />
       <SearchPalette />
+      <ContinuousJarvis />
+      <JarvisAutopilot />
     </div>
   );
 }

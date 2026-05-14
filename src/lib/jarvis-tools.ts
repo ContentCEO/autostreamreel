@@ -6,6 +6,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAllowed } from "@/lib/permissions";
 import { sendOutboundRow } from "@/lib/outbound";
 import { createAlert as createAlertHelper } from "@/lib/alerts";
+import { fetchUrlAsText, webSearch, buildMapsUrl } from "@/lib/web-tools";
 
 export const JARVIS_TOOLS = [
   // ---- read ----
@@ -200,6 +201,37 @@ export const JARVIS_TOOLS = [
       additionalProperties: false,
     },
   },
+  // ---- web ----
+  {
+    name: "web_search",
+    description: "Search the web for up-to-date information. Returns title/url/snippet for top results.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string" }, limit: { type: "number" } },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "fetch_url",
+    description: "Fetch a webpage and return its text content (HTML stripped). Useful for reading articles, docs, or specific pages found via web_search.",
+    input_schema: {
+      type: "object",
+      properties: { url: { type: "string" } },
+      required: ["url"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "open_map",
+    description: "Build a Google Maps URL for a place or directions and instruct the owner's client to open it. The client will open the map in a new tab.",
+    input_schema: {
+      type: "object",
+      properties: { query: { type: "string" }, origin: { type: "string" } },
+      required: ["query"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const WRITE_TOOLS = new Set([
@@ -377,6 +409,19 @@ export async function runJarvisTool(
       if (input.ai_score) patch.ai_score = input.ai_score;
       const { error } = await admin.from("leads").update(patch).eq("id", input.id as string);
       return error ? { error: error.message } : { ok: true };
+    }
+    case "web_search": {
+      const hits = await webSearch(String(input.query), Number(input.limit ?? 5));
+      return hits;
+    }
+    case "fetch_url": {
+      const result = await fetchUrlAsText(String(input.url));
+      if (!result.ok) return result;
+      return { ok: true, status: result.status, text: result.text.slice(0, 8000) };
+    }
+    case "open_map": {
+      const url = buildMapsUrl(String(input.query), input.origin ? String(input.origin) : undefined);
+      return { url, action: "open_in_new_tab" };
     }
     default:
       return { error: `unknown tool ${name}` };

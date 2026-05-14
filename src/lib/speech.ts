@@ -116,3 +116,89 @@ export function listenOnce(handlers: {
   rec.start();
   return { stop: () => rec.stop() };
 }
+
+// Continuous always-listening mode. Keeps the recognizer alive across
+// utterance boundaries by restarting on `onend`. Each completed utterance is
+// passed to onUtterance. Caller decides whether to act on it (e.g. only when
+// the utterance contains "jarvis").
+export function listenContinuous(handlers: {
+  onUtterance: (transcript: string) => void;
+  onError?: (err: string) => void;
+}): { stop: () => void } | null {
+  if (!isListenSupported()) {
+    handlers.onError?.("speech recognition not supported in this browser");
+    return null;
+  }
+  const w = window as SpeechWindow;
+  const Ctor = w.SpeechRecognition ?? w.webkitSpeechRecognition!;
+  let rec: RecognitionInstance | null = null;
+  let stopped = false;
+
+  function start() {
+    if (stopped) return;
+    rec = new Ctor();
+    rec.continuous = true;
+    rec.interimResults = false;
+    rec.lang = "en-US";
+    rec.onresult = (e) => {
+      for (let i = 0; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          const t = r[0].transcript.trim();
+          if (t) handlers.onUtterance(t);
+        }
+      }
+    };
+    rec.onerror = (e) => {
+      // "no-speech" / "aborted" / "audio-capture" are routine — keep going.
+      if (e.error !== "no-speech" && e.error !== "aborted") {
+        handlers.onError?.(e.error);
+      }
+    };
+    rec.onend = () => {
+      // Auto-restart unless caller stopped us.
+      if (!stopped) setTimeout(start, 300);
+    };
+    try { rec.start(); } catch { /* might already be started */ }
+  }
+
+  start();
+  return {
+    stop: () => {
+      stopped = true;
+      try { rec?.abort(); } catch { /* ignore */ }
+    },
+  };
+}
+
+const WAKE_WORDS = ["jarvis", "hey jarvis", "okay jarvis", "hey command", "command center"];
+
+// Returns the utterance with the wake word stripped if it matches, or null.
+export function extractWakeUtterance(transcript: string): string | null {
+  const lower = transcript.toLowerCase();
+  for (const w of WAKE_WORDS) {
+    const idx = lower.indexOf(w);
+    if (idx !== -1) {
+      const after = transcript.slice(idx + w.length).trim();
+      // If just "jarvis" with nothing after, still return empty -> a greeting.
+      return after || "";
+    }
+  }
+  return null;
+}
+
+const LISTEN_PREF_KEY = "cc_listen_mode";
+export type ListenMode = "off" | "wake" | "always";
+
+export function getListenMode(): ListenMode {
+  if (typeof window === "undefined") return "off";
+  const v = localStorage.getItem(LISTEN_PREF_KEY);
+  if (v === "wake" || v === "always" || v === "off") return v;
+  return "off";
+}
+
+export function setListenMode(mode: ListenMode) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(LISTEN_PREF_KEY, mode);
+  window.dispatchEvent(new Event("cc:listen-changed"));
+}
