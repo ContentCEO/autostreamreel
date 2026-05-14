@@ -8,7 +8,7 @@ export function isElevenLabsConfigured(): boolean {
 }
 
 const DEFAULT_VOICE_ID = process.env.ELEVENLABS_VOICE_ID
-  ?? "EXAVITQu4vr4xnSDxMaL";    // "Sarah" — clean, natural default. Override via env.
+  ?? "onwK4e9ZLuTAKqWW03F9";    // "Daniel" — deep British male, MCU-Jarvis-feeling default.
 
 const DEFAULT_MODEL = process.env.ELEVENLABS_MODEL ?? "eleven_turbo_v2_5";
 
@@ -34,9 +34,10 @@ export async function streamElevenLabsTTS(text: string, opts: { voiceId?: string
         text,
         model_id: DEFAULT_MODEL,
         voice_settings: {
-          stability: 0.45,
-          similarity_boost: 0.75,
-          style: 0.35,
+          // Slightly less stable + more style = more expressive, less monotone.
+          stability: 0.35,
+          similarity_boost: 0.80,
+          style: 0.55,
           use_speaker_boost: true,
         },
       }),
