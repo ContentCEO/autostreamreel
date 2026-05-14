@@ -57,11 +57,46 @@ function pickVoice(): SpeechSynthesisVoice | null {
   return cachedVoice;
 }
 
-export function speak(text: string, opts: { rate?: number; pitch?: number; volume?: number } = {}) {
+// Cache the configured state so we don't /api/tts ping on every utterance.
+let elevenLabsAvailable: boolean | null = null;
+async function probeElevenLabs(): Promise<boolean> {
+  if (elevenLabsAvailable !== null) return elevenLabsAvailable;
+  try {
+    const r = await fetch("/api/tts", { method: "GET" });
+    const j = await r.json();
+    elevenLabsAvailable = Boolean(j.configured);
+  } catch {
+    elevenLabsAvailable = false;
+  }
+  return elevenLabsAvailable;
+}
+
+// Sequential audio queue. Each speakChunk() enqueues an MP3 fetch from
+// /api/tts and plays clips in arrival order, so streaming sentence-by-sentence
+// from a Claude reply produces smooth back-to-back natural speech.
+let audioQueue: Promise<void> = Promise.resolve();
+let currentAudio: HTMLAudioElement | null = null;
+
+async function playElevenLabsClip(text: string): Promise<void> {
+  const res = await fetch("/api/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!res.ok || !res.body) return;
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  await new Promise<void>((resolve) => {
+    const audio = new Audio(url);
+    currentAudio = audio;
+    audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+    audio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
+    audio.play().catch(() => { URL.revokeObjectURL(url); currentAudio = null; resolve(); });
+  });
+}
+
+function browserSpeak(text: string, opts: { rate?: number; pitch?: number; volume?: number } = {}) {
   if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  if (!isVoiceEnabled()) return;
-  if (!text || !text.trim()) return;
-  // Cancel anything currently being said so we don't pile up.
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(text);
   const v = pickVoice();
@@ -72,9 +107,51 @@ export function speak(text: string, opts: { rate?: number; pitch?: number; volum
   window.speechSynthesis.speak(u);
 }
 
+// Drop-in replacement for the old speak(): cancels prior speech and queues
+// the new text. Uses ElevenLabs when configured, else falls back to browser
+// TTS. Awaits the playback so chained speak() calls don't overlap.
+export function speak(text: string, opts: { rate?: number; pitch?: number; volume?: number } = {}) {
+  if (typeof window === "undefined") return;
+  if (!isVoiceEnabled()) return;
+  if (!text || !text.trim()) return;
+  // Cancel anything already speaking — preserves the "interrupt on new
+  // utterance" semantics the rest of the app already relies on.
+  cancelSpeech();
+  audioQueue = (async () => {
+    if (await probeElevenLabs()) {
+      await playElevenLabsClip(text);
+    } else {
+      browserSpeak(text, opts);
+    }
+  })();
+  void audioQueue;
+}
+
+// Streaming variant: enqueue a chunk to be spoken in order without cancelling
+// what's already playing. Use when Claude streams in: split by sentence, call
+// speakChunk(sentence) as each completes — audio plays back-to-back.
+export function speakChunk(text: string) {
+  if (typeof window === "undefined") return;
+  if (!isVoiceEnabled()) return;
+  if (!text || !text.trim()) return;
+  audioQueue = audioQueue.then(async () => {
+    if (await probeElevenLabs()) {
+      await playElevenLabsClip(text);
+    } else {
+      browserSpeak(text);
+    }
+  });
+}
+
 export function cancelSpeech() {
-  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
-  window.speechSynthesis.cancel();
+  if (typeof window === "undefined") return;
+  if ("speechSynthesis" in window) window.speechSynthesis.cancel();
+  if (currentAudio) {
+    try { currentAudio.pause(); currentAudio.src = ""; } catch { /* ignore */ }
+    currentAudio = null;
+  }
+  // Reset the queue so future speakChunk() calls start fresh.
+  audioQueue = Promise.resolve();
 }
 
 export function isListenSupported(): boolean {

@@ -4,7 +4,7 @@ import { isOwnerEmail } from "@/lib/owner";
 import { Sidebar } from "@/components/Sidebar";
 import { JarvisPanel } from "@/components/JarvisPanel";
 import { TakeoverBoot } from "@/components/TakeoverBoot";
-import { BriefingOnOpen } from "@/components/BriefingOnOpen";
+import { BootSequence } from "@/components/BootSequence";
 import { CriticalTakeover } from "@/components/CriticalTakeover";
 import { StatusBar } from "@/components/StatusBar";
 import { SearchPalette } from "@/components/SearchPalette";
@@ -28,7 +28,7 @@ export default async function CCLayout({ children }: { children: React.ReactNode
       </main>
       <JarvisPanel />
       <TakeoverBoot />
-      <BriefingOnOpen />
+      <BootSequence />
       <CriticalTakeover />
       <SearchPalette />
       <ContinuousJarvis />
