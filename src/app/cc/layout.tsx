@@ -21,8 +21,8 @@ export const dynamic = "force-dynamic";
 export default async function CCLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  if (!isOwnerEmail(user.email)) redirect("/login?error=not_owner");
+  if (!user) redirect("/enter");
+  if (!isOwnerEmail(user.email)) redirect("/enter?error=not_owner");
 
   return (
     <div className="min-h-screen text-ink-100">

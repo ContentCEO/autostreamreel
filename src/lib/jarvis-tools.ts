@@ -7,6 +7,7 @@ import { isAllowed } from "@/lib/permissions";
 import { sendOutboundRow } from "@/lib/outbound";
 import { createAlert as createAlertHelper } from "@/lib/alerts";
 import { fetchUrlAsText, webSearch, buildMapsUrl } from "@/lib/web-tools";
+import { listRecentEmails, sendEmail, listUpcomingEvents, createCalendarEvent } from "@/lib/google";
 
 export const JARVIS_TOOLS = [
   // ---- read ----
@@ -232,6 +233,51 @@ export const JARVIS_TOOLS = [
       additionalProperties: false,
     },
   },
+  // ---- email + calendar (Google) ----
+  {
+    name: "list_recent_emails",
+    description: "List the owner's most recent inbox emails (subject, from, snippet, date).",
+    input_schema: {
+      type: "object",
+      properties: { limit: { type: "number" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "send_email",
+    description: "Send an email from the owner's Gmail account.",
+    input_schema: {
+      type: "object",
+      properties: { to: { type: "string" }, subject: { type: "string" }, body: { type: "string" } },
+      required: ["to", "subject", "body"],
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "list_calendar_events",
+    description: "List the owner's upcoming Google Calendar events.",
+    input_schema: {
+      type: "object",
+      properties: { limit: { type: "number" } },
+      additionalProperties: false,
+    },
+  },
+  {
+    name: "create_calendar_event",
+    description: "Add an event to the owner's primary Google Calendar.",
+    input_schema: {
+      type: "object",
+      properties: {
+        summary: { type: "string" },
+        description: { type: "string" },
+        start: { type: "string", description: "ISO 8601 start datetime" },
+        end:   { type: "string", description: "ISO 8601 end datetime" },
+        location: { type: "string" },
+      },
+      required: ["summary", "start", "end"],
+      additionalProperties: false,
+    },
+  },
 ];
 
 const WRITE_TOOLS = new Set([
@@ -423,6 +469,24 @@ export async function runJarvisTool(
       const url = buildMapsUrl(String(input.query), input.origin ? String(input.origin) : undefined);
       return { url, action: "open_in_new_tab" };
     }
+    case "list_recent_emails":
+      return await listRecentEmails(Number(input.limit ?? 10));
+    case "send_email":
+      return await sendEmail({
+        to:      String(input.to),
+        subject: String(input.subject),
+        body:    String(input.body),
+      });
+    case "list_calendar_events":
+      return await listUpcomingEvents(Number(input.limit ?? 10));
+    case "create_calendar_event":
+      return await createCalendarEvent({
+        summary:     String(input.summary),
+        description: input.description ? String(input.description) : undefined,
+        start:       String(input.start),
+        end:         String(input.end),
+        location:    input.location ? String(input.location) : undefined,
+      });
     default:
       return { error: `unknown tool ${name}` };
   }
