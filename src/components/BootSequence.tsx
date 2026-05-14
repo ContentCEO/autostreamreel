@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { JarvisOrb } from "@/components/JarvisOrb";
-import { speak, cancelSpeech, isVoiceEnabled } from "@/lib/speech";
+import { speak, cancelSpeech, isVoiceEnabled, getListenMode, setListenMode } from "@/lib/speech";
 
 const BOOT_LINES = [
   "Booting Control Center.",
@@ -96,6 +96,12 @@ export function BootSequence() {
       setVisible(false);
       if (typeof window !== "undefined") {
         sessionStorage.setItem("cc_boot_done", "1");
+        // First boot ever — default the user into wake-word listening so
+        // "Hey Jarvis" actually does something out of the box. We don't
+        // request mic permission here; ContinuousJarvis surfaces any denial.
+        if (!localStorage.getItem("cc_listen_mode") && getListenMode() === "off") {
+          setListenMode("wake");
+        }
       }
     }, 800);
   }
@@ -118,13 +124,13 @@ export function BootSequence() {
       onClick={skip}
       className={`fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center text-ink-100 cursor-pointer select-none transition-opacity duration-700 ${fading ? "opacity-0" : "opacity-100"}`}
     >
-      <JarvisOrb size={300} count={1200} color="#4DB8FF" speaking={speaking} />
+      <JarvisOrb size={300} count={1200} color="#4DB8FF" state={speaking ? "speaking" : "thinking"} label="JARVIS" />
 
       <div
         className="mt-10 tabular-nums"
         style={{
           fontFamily: 'var(--font-display, "Orbitron", system-ui, sans-serif)',
-          fontWeight: 200,
+          fontWeight: 400,
           fontSize: 72,
           letterSpacing: "0.18em",
           color: "rgba(230, 245, 255, 0.95)",
@@ -138,7 +144,7 @@ export function BootSequence() {
         className="mt-2"
         style={{
           fontFamily: 'var(--font-display, "Orbitron", system-ui, sans-serif)',
-          fontWeight: 300,
+          fontWeight: 400,
           fontSize: 13,
           letterSpacing: "0.32em",
           color: "rgba(180, 200, 220, 0.7)",

@@ -78,6 +78,7 @@ let audioQueue: Promise<void> = Promise.resolve();
 let currentAudio: HTMLAudioElement | null = null;
 
 async function playElevenLabsClip(text: string): Promise<void> {
+  const { setOrbState } = await import("@/lib/orb-state");
   const res = await fetch("/api/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -89,9 +90,16 @@ async function playElevenLabsClip(text: string): Promise<void> {
   await new Promise<void>((resolve) => {
     const audio = new Audio(url);
     currentAudio = audio;
-    audio.onended = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
-    audio.onerror = () => { URL.revokeObjectURL(url); currentAudio = null; resolve(); };
-    audio.play().catch(() => { URL.revokeObjectURL(url); currentAudio = null; resolve(); });
+    setOrbState("speaking");
+    const cleanup = () => {
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+      setOrbState("idle");
+      resolve();
+    };
+    audio.onended = cleanup;
+    audio.onerror = cleanup;
+    audio.play().catch(cleanup);
   });
 }
 
@@ -104,7 +112,12 @@ function browserSpeak(text: string, opts: { rate?: number; pitch?: number; volum
   u.rate   = opts.rate   ?? 1.0;
   u.pitch  = opts.pitch  ?? 1.0;
   u.volume = opts.volume ?? 1.0;
-  window.speechSynthesis.speak(u);
+  import("@/lib/orb-state").then(({ setOrbState }) => {
+    setOrbState("speaking");
+    u.onend   = () => setOrbState("idle");
+    u.onerror = () => setOrbState("idle");
+    window.speechSynthesis.speak(u);
+  });
 }
 
 // Drop-in replacement for the old speak(): cancels prior speech and queues

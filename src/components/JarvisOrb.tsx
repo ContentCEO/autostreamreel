@@ -2,30 +2,38 @@
 
 import { useEffect, useRef } from "react";
 
+export type OrbState = "idle" | "listening" | "thinking" | "speaking";
+
 interface Props {
-  size?: number;        // px diameter of the canvas (square)
-  count?: number;       // number of particles on the sphere
-  color?: string;       // base particle color (CSS)
-  speaking?: boolean;   // when true, the orb gently breathes faster
-  label?: string;       // centered text inside the orb (default "JARVIS")
+  size?: number;
+  count?: number;
+  color?: string;
+  state?: OrbState;        // drives animation intensity / color shift
+  speaking?: boolean;      // legacy alias for state="speaking"
+  label?: string | null;   // centered text inside the orb (set to null to hide)
 }
 
 // Canvas-based particle sphere matching the huwprosser reference: cyan-blue
 // dots distributed on a sphere surface via Fibonacci spiral, rotating gently
-// around Y. No Three.js dependency. Audio reactivity is a hook (`speaking`)
-// that we can drive from the boot sequence / TTS playback layer later.
+// around Y. No Three.js dependency. The state prop drives intensity:
+//   idle      — slow breath, slow yaw
+//   listening — quicker breath, hint of green
+//   thinking  — fast breath, slight color shift
+//   speaking  — fastest breath + faster rotation
 export function JarvisOrb({
   size = 280,
   count = 1200,
   color = "#4DB8FF",
+  state,
   speaking = false,
   label = "JARVIS",
 }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rafRef    = useRef<number>(0);
-  const speakingRef = useRef<boolean>(speaking);
+  const effective: OrbState = state ?? (speaking ? "speaking" : "idle");
+  const stateRef = useRef<OrbState>(effective);
 
-  useEffect(() => { speakingRef.current = speaking; }, [speaking]);
+  useEffect(() => { stateRef.current = effective; }, [effective]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -53,25 +61,44 @@ export function JarvisOrb({
 
     const cx = size / 2;
     const cy = size / 2;
-    const r  = size * 0.36;   // sphere radius in px
+    const r  = size * 0.36;
 
     let t = 0;
     function frame() {
       t += 0.005;
-      const breathe = speakingRef.current ? 1 + Math.sin(t * 4) * 0.025 : 1 + Math.sin(t * 1.2) * 0.012;
+      const s = stateRef.current;
+      const breatheRate =
+        s === "speaking"  ? 4.5 :
+        s === "thinking"  ? 2.8 :
+        s === "listening" ? 2.2 : 1.2;
+      const breatheAmp =
+        s === "speaking"  ? 0.030 :
+        s === "thinking"  ? 0.020 :
+        s === "listening" ? 0.018 : 0.012;
+      const yawRate =
+        s === "speaking" ? 0.55 :
+        s === "thinking" ? 0.45 : 0.35;
+      const breathe = 1 + Math.sin(t * breatheRate) * breatheAmp;
       const radius = r * breathe;
-      const yaw    = t * 0.35;
+      const yaw    = t * yawRate;
       const cosY = Math.cos(yaw), sinY = Math.sin(yaw);
-      const tilt = 0.18;             // tiny constant X tilt
+      const tilt = 0.18;
       const cosX = Math.cos(tilt), sinX = Math.sin(tilt);
+
+      // Color tint by state — listening greens a bit, thinking warms slightly.
+      const tint =
+        s === "listening" ? "rgba(120, 200, 220," :
+        s === "thinking"  ? "rgba(160, 180, 255," : "rgba(77, 184, 255,";
+      const dotColor = s === "idle" || s === "speaking" ? color
+        : s === "listening" ? "#7CE0E0" : "#A0B4FF";
 
       ctx!.clearRect(0, 0, size, size);
 
       // Soft inner glow.
       const grad = ctx!.createRadialGradient(cx, cy, 0, cx, cy, radius);
-      grad.addColorStop(0,    "rgba(77, 184, 255, 0.18)");
-      grad.addColorStop(0.55, "rgba(77, 184, 255, 0.06)");
-      grad.addColorStop(1,    "rgba(77, 184, 255, 0)");
+      grad.addColorStop(0,    `${tint} 0.18)`);
+      grad.addColorStop(0.55, `${tint} 0.06)`);
+      grad.addColorStop(1,    `${tint} 0)`);
       ctx!.fillStyle = grad;
       ctx!.beginPath();
       ctx!.arc(cx, cy, radius * 1.15, 0, Math.PI * 2);
@@ -80,19 +107,16 @@ export function JarvisOrb({
       // Render every particle: rotate, project, scale alpha + size by z.
       for (let i = 0; i < points.length; i++) {
         const p = points[i];
-        // Yaw around Y.
         const x1 =  p.x * cosY + p.z * sinY;
         const z1 = -p.x * sinY + p.z * cosY;
-        // Tilt around X.
         const y2 = p.y * cosX - z1 * sinX;
         const z2 = p.y * sinX + z1 * cosX;
-        // Project — orthographic-ish with mild perspective scaling.
-        const depth = (z2 + 1) / 2;                     // 0 (back) -> 1 (front)
+        const depth = (z2 + 1) / 2;
         const px = cx + x1 * radius;
         const py = cy + y2 * radius;
         const alpha = 0.20 + depth * 0.75;
         const dotR  = 0.6 + depth * 1.0;
-        ctx!.fillStyle = color;
+        ctx!.fillStyle = dotColor;
         ctx!.globalAlpha = alpha;
         ctx!.beginPath();
         ctx!.arc(px, py, dotR, 0, Math.PI * 2);
@@ -113,7 +137,7 @@ export function JarvisOrb({
           className="absolute inset-0 grid place-items-center pointer-events-none select-none"
           style={{
             fontFamily: 'var(--font-display, "Orbitron", system-ui, sans-serif)',
-            fontWeight: 300,
+            fontWeight: 400,
             letterSpacing: "0.32em",
             fontSize: Math.round(size * 0.072),
             color: "rgba(220, 240, 255, 0.78)",

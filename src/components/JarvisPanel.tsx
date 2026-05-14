@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Send, Sparkles, Mic, MicOff, Monitor } from "lucide-react";
+import { Send, Mic, MicOff, Monitor } from "lucide-react";
 import { speak, listenOnce, isListenSupported } from "@/lib/speech";
 import { VoiceToggle } from "@/components/VoiceToggle";
 import { ComputerUsePanel } from "@/components/ComputerUsePanel";
+import { JarvisOrb, type OrbState } from "@/components/JarvisOrb";
 import { isDesktop } from "@/lib/desktop";
+import { subscribeOrbState, setOrbState } from "@/lib/orb-state";
 
 interface Msg { role: "user" | "assistant"; content: string }
 
@@ -18,16 +20,17 @@ export function JarvisPanel() {
   const [listening, setListening] = useState(false);
   const [computerOpen, setComputerOpen] = useState(false);
   const [showTakeover, setShowTakeover] = useState(false);
+  const [orb, setOrb] = useState<OrbState>("idle");
   const scrollRef = useRef<HTMLDivElement>(null);
   const stopRef   = useRef<{ stop: () => void } | null>(null);
 
   useEffect(() => { setShowTakeover(isDesktop()); }, []);
+  useEffect(() => subscribeOrbState(setOrb), []);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [messages]);
 
-  // Mirror spoken-utterance turns from ContinuousJarvis into the panel.
   useEffect(() => {
     function onTurn(e: Event) {
       const d = (e as CustomEvent<{ user: string; assistant: string }>).detail;
@@ -45,6 +48,7 @@ export function JarvisPanel() {
     const next = [...messages, { role: "user" as const, content: text }];
     setMessages(next);
     setBusy(true);
+    setOrbState("thinking");
     try {
       const res = await fetch("/api/jarvis", {
         method: "POST",
@@ -79,35 +83,48 @@ export function JarvisPanel() {
       return;
     }
     setListening(true);
+    setOrbState("listening");
     stopRef.current = listenOnce({
       onResult: (transcript) => {
         setListening(false);
         setInput("");
         send(transcript);
       },
-      onError:  () => setListening(false),
-      onEnd:    () => setListening(false),
+      onError:  () => { setListening(false); setOrbState("idle"); },
+      onEnd:    () => { setListening(false); },
     });
   }
 
+  const statusLabel =
+    orb === "speaking"  ? "speaking" :
+    orb === "thinking"  ? "thinking" :
+    orb === "listening" ? "listening" : "online";
+
   return (
     <aside className="hidden lg:flex w-96 shrink-0 border-l border-ink-800 bg-ink-900/40 flex-col">
-      <header className="px-4 py-3 border-b border-ink-800 flex items-center gap-2 flex-wrap">
-        <Sparkles size={14} className="text-accent-400" />
-        <div className="text-sm font-medium">Jarvis</div>
-        <span className="badge bg-success-500/20 text-success-500">online</span>
-        {showTakeover && (
-          <button
-            type="button"
-            onClick={() => setComputerOpen(true)}
-            title="Computer Use — let Jarvis drive this Mac"
-            className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs border border-ink-800 text-ink-400 hover:border-accent-500/40 hover:text-accent-300"
-          >
-            <Monitor size={12} /> Take over
-          </button>
-        )}
-        <div className="ml-auto"><VoiceToggle /></div>
-      </header>
+      {/* Persistent orb at the top — always visible, always animating. */}
+      <div className="px-4 pt-6 pb-3 border-b border-ink-800 flex flex-col items-center gap-2">
+        <JarvisOrb size={180} count={1100} state={orb} label="JARVIS" />
+        <div className="flex items-center gap-2 mt-1">
+          <span className={`badge ${
+            orb === "speaking"  ? "bg-accent-500/20 text-accent-300" :
+            orb === "thinking"  ? "bg-warn-500/20 text-warn-500" :
+            orb === "listening" ? "bg-success-500/20 text-success-500" :
+                                  "bg-ink-800 text-ink-300"
+          }`}>{statusLabel}</span>
+          {showTakeover && (
+            <button
+              type="button"
+              onClick={() => setComputerOpen(true)}
+              title="Computer Use — let Jarvis drive this Mac"
+              className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-[10px] uppercase tracking-widest border border-ink-800 text-ink-400 hover:border-accent-500/40 hover:text-accent-300"
+            >
+              <Monitor size={11} /> Take over
+            </button>
+          )}
+        </div>
+        <div className="w-full flex items-center justify-center"><VoiceToggle /></div>
+      </div>
 
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-3 space-y-3">
         {messages.map((m, i) => (
@@ -124,7 +141,7 @@ export function JarvisPanel() {
           type="button"
           onClick={toggleListen}
           disabled={busy}
-          title={listening ? "Stop listening" : "Talk to Jarvis"}
+          title={listening ? "Stop listening" : "Push-to-talk to Jarvis"}
           className={`btn-ghost px-2 ${listening ? "text-accent-300 bg-accent-500/10 border-accent-500/40" : ""}`}
         >
           {listening ? <MicOff size={14} /> : <Mic size={14} />}

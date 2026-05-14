@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { listenContinuous, extractWakeUtterance, getListenMode, speak } from "@/lib/speech";
+import { setOrbState } from "@/lib/orb-state";
 
 // Mounted once at the layout level. When the user has enabled "wake" or
 // "always" listen mode, this keeps a SpeechRecognition session alive in the
@@ -22,19 +23,20 @@ export function ContinuousJarvis() {
       const mode = getListenMode();
       stopRef.current?.stop();
       stopRef.current = null;
-      if (mode === "off") return;
+      if (mode === "off") { setOrbState("idle"); return; }
+      setOrbState("listening");
 
       stopRef.current = listenContinuous({
         onUtterance: async (raw) => {
-          // Don't interrupt an in-flight Jarvis turn.
           if (busyRef.current) return;
           let text = raw;
           if (mode === "wake") {
             const stripped = extractWakeUtterance(raw);
-            if (stripped === null) return;       // no wake word
+            if (stripped === null) return;
             text = stripped || "Are you there?";
           }
           busyRef.current = true;
+          setOrbState("thinking");
           try {
             const res = await fetch("/api/jarvis", {
               method: "POST",
@@ -46,19 +48,24 @@ export function ContinuousJarvis() {
             const data = await res.json();
             const reply = data.reply ?? "I didn't catch that.";
             speak(reply);
-            // Broadcast so the JarvisPanel can show the turn in its history.
             window.dispatchEvent(new CustomEvent("cc:jarvis-turn", {
               detail: { user: text, assistant: reply },
             }));
           } catch {
             speak("Sorry, I lost connection.");
-          } finally { busyRef.current = false; }
+          } finally {
+            busyRef.current = false;
+            // speak() will set orb back to "idle" when audio ends; here we
+            // restore "listening" so the orb shows we're still ready.
+            setTimeout(() => {
+              if (getListenMode() !== "off") setOrbState("listening");
+            }, 200);
+          }
         },
         onError: (e) => {
-          // The only fatal error we care about is the user denying mic
-          // permission. Anything else, just let auto-restart handle it.
           if (e === "not-allowed" || e === "service-not-allowed") {
             console.warn("[jarvis] mic permission denied");
+            setOrbState("idle");
           }
         },
       });
