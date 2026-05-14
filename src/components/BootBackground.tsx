@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { JarvisOrb, type OrbState } from "@/components/JarvisOrb";
 import { subscribeOrbState } from "@/lib/orb-state";
 
@@ -8,8 +9,11 @@ import { subscribeOrbState } from "@/lib/orb-state";
 // DAY DATE MONTH. Lives behind everything in /cc. When a tab is "open"
 // (children visible in the sliding panel), the boot view dims and shrinks
 // the orb upward slightly so the tab can breathe — but the orb is always
-// there, never dismissed.
-export function BootBackground({ dimmed }: { dimmed: boolean }) {
+// there, never dismissed. The component reads pathname itself so the
+// layout doesn't have to plumb a dimmed prop down.
+export function BootBackground() {
+  const pathname = usePathname();
+  const dimmed = pathname !== "/cc";
   const [now, setNow] = useState<Date>(() => new Date());
   const [orb, setOrb] = useState<OrbState>("idle");
 
@@ -30,7 +34,7 @@ export function BootBackground({ dimmed }: { dimmed: boolean }) {
   const orbWrapperOpacity = dimmed ? 0.78 : 1;
 
   return (
-    <div className="fixed inset-0 bg-black -z-10 overflow-hidden">
+    <div className="fixed inset-0 bg-black overflow-hidden" style={{ zIndex: 0 }}>
       <div
         className="absolute inset-0 flex flex-col items-center justify-center transition-all duration-700 ease-out"
         style={{ transform: translate, opacity: orbWrapperOpacity }}

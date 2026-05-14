@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { isOwnerEmail } from "@/lib/owner";
 import { Sidebar } from "@/components/Sidebar";
-import { JarvisPanel } from "@/components/JarvisPanel";
 import { TakeoverBoot } from "@/components/TakeoverBoot";
 import { CriticalTakeover } from "@/components/CriticalTakeover";
 import { StatusBar } from "@/components/StatusBar";
@@ -11,9 +10,14 @@ import { ContinuousJarvis } from "@/components/ContinuousJarvis";
 import { JarvisAutopilot } from "@/components/JarvisAutopilot";
 import { SlidingTab } from "@/components/SlidingTab";
 import { AuthGate } from "@/components/AuthGate";
+import { BootBackground } from "@/components/BootBackground";
+import { JarvisHUD } from "@/components/JarvisHUD";
 
 export const dynamic = "force-dynamic";
 
+// The /cc layout: persistent orb home, sidebar overlay, sliding tab panel,
+// floating Jarvis HUD (mic + voice controls) in the top right corner.
+// There is no permanent chat sidebar — Jarvis is voice-first now.
 export default async function CCLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -21,20 +25,24 @@ export default async function CCLayout({ children }: { children: React.ReactNode
   if (!isOwnerEmail(user.email)) redirect("/login?error=not_owner");
 
   return (
-    <div className="min-h-screen text-ink-100 bg-black relative">
-      {/* Auth challenge (name + code) — runs once per session if configured. */}
+    <div className="min-h-screen text-ink-100">
+      {/* Always-on home: black background, orb, clock, date. */}
+      <BootBackground />
+
       <AuthGate>
-        <div className="min-h-screen flex">
+        <div className="min-h-screen flex relative">
           <Sidebar email={user.email ?? null} />
           <main className="flex-1 min-w-0 flex flex-col relative">
             <div className="flex-1 relative">
-              {/* SlidingTab renders the orb background AND the sliding
-                  content panel that contains the children. */}
               <SlidingTab>{children}</SlidingTab>
             </div>
             <StatusBar />
           </main>
-          <JarvisPanel />
+
+          {/* Floating Jarvis HUD — mic + voice + listen mode controls.
+              Positioned top-right; replaces the old chat sidebar. */}
+          <JarvisHUD />
+
           <TakeoverBoot />
           <CriticalTakeover />
           <SearchPalette />

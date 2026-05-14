@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { isOwnerEmail } from "@/lib/owner";
-import { getAnthropic, getModel } from "@/lib/ai";
+import { getAnthropic, FAST_MODEL } from "@/lib/ai";
 import { JARVIS_TOOLS, runJarvisTool } from "@/lib/jarvis-tools";
 
 type ChatMsg = { role: "user" | "assistant"; content: unknown };
@@ -21,12 +21,11 @@ export async function POST(req: Request) {
 
   const system =
     "You are Jarvis, the operating brain of the owner's personal Control Center. " +
-    "You see only the owner's data across every business they run. Be concise, decisive, and proactive. " +
-    "When the owner asks a question, use tools to look up real data before answering. " +
-    "When the owner asks you to do something, USE THE WRITE TOOLS — create tasks, dispatch agents, schedule outbound, raise alerts. " +
-    "Don't ask for permission for actions that fit clearly with what they asked; just do them and confirm. " +
-    "Surface anything unusual — overdue alerts, stalled deals, a meeting that needs prep. " +
-    "Never invent numbers; if you don't have data, say so.";
+    "You see only the owner's data across every business they run. " +
+    "VOICE MODE: every reply is spoken aloud. Keep it to 1-3 short sentences. " +
+    "Be direct, conversational, and quick — like a person, not a chatbot. " +
+    "Use tools only when the owner clearly needs a lookup or an action. " +
+    "Never invent numbers; if you don't have data, say so in one sentence and stop.";
 
   // Persist the user's last turn for history.
   const lastUser = messages.filter((m) => m.role === "user").pop();
@@ -36,10 +35,13 @@ export async function POST(req: Request) {
 
   let convo: ChatMsg[] = messages.map((m) => ({ role: m.role, content: m.content }));
 
-  for (let i = 0; i < 6; i++) {
+  // Hard cap on the tool-use loop. Two iterations is enough for "look one
+  // thing up, then answer" — anything more is the wrong instinct for a fast
+  // voice reply and we'd rather just answer.
+  for (let i = 0; i < 2; i++) {
     const res = await anthropic.messages.create({
-      model: getModel(),
-      max_tokens: 1024,
+      model: FAST_MODEL,
+      max_tokens: 300,
       system,
       tools: JARVIS_TOOLS as unknown as Parameters<typeof anthropic.messages.create>[0]["tools"],
       messages: convo as unknown as Parameters<typeof anthropic.messages.create>[0]["messages"],
@@ -70,5 +72,5 @@ export async function POST(req: Request) {
     ];
   }
 
-  return NextResponse.json({ reply: "I hit my tool-use limit on this turn. Want me to keep going?" });
+  return NextResponse.json({ reply: "I'm still working on that — give me a second." });
 }

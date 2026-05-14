@@ -4,6 +4,11 @@ import Anthropic from "@anthropic-ai/sdk";
 // tool-use. Override with ANTHROPIC_MODEL.
 const MODEL = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
+// Faster model for the Jarvis voice loop. Haiku responds noticeably quicker,
+// which matters more than depth when you're literally waiting for the next
+// sentence to be spoken aloud. Override with ANTHROPIC_FAST_MODEL.
+export const FAST_MODEL = process.env.ANTHROPIC_FAST_MODEL ?? "claude-haiku-4-5-20251001";
+
 let client: Anthropic | null = null;
 function getClient(): Anthropic {
   if (!process.env.ANTHROPIC_API_KEY) {
