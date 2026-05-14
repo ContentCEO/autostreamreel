@@ -79,6 +79,7 @@ let currentAudio: HTMLAudioElement | null = null;
 
 async function playElevenLabsClip(text: string): Promise<void> {
   const { setOrbState } = await import("@/lib/orb-state");
+  const { startBargeInWatcher, stopBargeInWatcher } = await import("@/lib/barge-in");
   const res = await fetch("/api/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -91,9 +92,13 @@ async function playElevenLabsClip(text: string): Promise<void> {
     const audio = new Audio(url);
     currentAudio = audio;
     setOrbState("speaking");
+    // Open the barge-in mic the moment audio starts; interrupted speech
+    // will set currentAudio to null + cancel the queue.
+    void startBargeInWatcher();
     const cleanup = () => {
       URL.revokeObjectURL(url);
       currentAudio = null;
+      stopBargeInWatcher();
       setOrbState("idle");
       resolve();
     };
@@ -112,10 +117,15 @@ function browserSpeak(text: string, opts: { rate?: number; pitch?: number; volum
   u.rate   = opts.rate   ?? 1.0;
   u.pitch  = opts.pitch  ?? 1.0;
   u.volume = opts.volume ?? 1.0;
-  import("@/lib/orb-state").then(({ setOrbState }) => {
-    setOrbState("speaking");
-    u.onend   = () => setOrbState("idle");
-    u.onerror = () => setOrbState("idle");
+  Promise.all([
+    import("@/lib/orb-state"),
+    import("@/lib/barge-in"),
+  ]).then(([orb, barge]) => {
+    orb.setOrbState("speaking");
+    void barge.startBargeInWatcher();
+    const done = () => { orb.setOrbState("idle"); barge.stopBargeInWatcher(); };
+    u.onend   = done;
+    u.onerror = done;
     window.speechSynthesis.speak(u);
   });
 }

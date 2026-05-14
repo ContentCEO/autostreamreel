@@ -1,40 +1,78 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { listenContinuous, extractWakeUtterance, getListenMode, speak } from "@/lib/speech";
+import { listenContinuous, listenOnce, extractWakeUtterance, getListenMode, speak } from "@/lib/speech";
 import { setOrbState } from "@/lib/orb-state";
 import { streamJarvisVoice } from "@/lib/jarvis-stream";
 import { isDeepgramConfigured, listenWithDeepgram, type DeepgramController } from "@/lib/deepgram";
+import { isWakeWordConfigured, startWakeWordListener } from "@/lib/wake-word";
 
-// Background listener mounted in /cc layout. When listen mode is enabled,
-// keeps a STT session alive (Deepgram if configured, else browser Web
-// Speech) and routes recognized utterances into Jarvis.
+// Background voice loop. Decision tree on mount:
 //
-// Wake-word mode: only utterances containing "jarvis" / "hey jarvis" /
-// "command center" trigger a turn (the wake word is stripped first).
+//   Porcupine + Deepgram → Best mode. Porcupine listens continuously for
+//                           "Jarvis" on-device (~30ms, no false positives).
+//                           On wake, spin up Deepgram for a single utterance,
+//                           then return to Porcupine-only mode.
 //
-// Speculative response (#2): on Deepgram, a long-enough partial pre-warms
-// the Anthropic stream so the final-transcript turn lands faster. The
-// pre-warm is aborted as soon as a final transcript supersedes it.
+//   Porcupine only       → Wake fires; we then run Web Speech for one
+//                           utterance.
+//
+//   Deepgram only        → Stream Deepgram continuously; substring-match
+//                           "jarvis" on partials/finals (current behavior).
+//
+//   Neither              → Web Speech listenContinuous + substring wake.
+//
+// "always" listen mode bypasses the wake gate in any mode.
 export function ContinuousJarvis() {
-  const stopRef = useRef<{ stop: () => void } | DeepgramController | null>(null);
+  const stopFns = useRef<Array<() => void | Promise<void>>>([]);
   const busyRef = useRef(false);
   const inflightAbortRef = useRef<AbortController | null>(null);
   const lastSpecAtRef = useRef<number>(0);
 
   useEffect(() => {
     let cancelled = false;
+
+    async function runJarvis(text: string) {
+      if (busyRef.current) return;
+      inflightAbortRef.current?.abort();
+      inflightAbortRef.current = null;
+      busyRef.current = true;
+      setOrbState("thinking");
+      try {
+        const reply = await streamJarvisVoice({ text });
+        window.dispatchEvent(new CustomEvent("cc:jarvis-turn", {
+          detail: { user: text, assistant: reply },
+        }));
+      } catch {
+        speak("Sorry, I lost connection.");
+      } finally {
+        busyRef.current = false;
+        setTimeout(() => {
+          if (getListenMode() !== "off") setOrbState("listening");
+        }, 200);
+      }
+    }
+
+    function stopAll() {
+      while (stopFns.current.length) {
+        try { void stopFns.current.pop()?.(); } catch { /* ignore */ }
+      }
+    }
+
     async function start() {
       const mode = getListenMode();
-      stopRef.current?.stop();
-      stopRef.current = null;
+      stopAll();
+      inflightAbortRef.current?.abort();
       if (mode === "off") { setOrbState("idle"); return; }
       setOrbState("listening");
 
-      const useDeepgram = await isDeepgramConfigured();
+      const [hasWake, hasDg] = await Promise.all([
+        isWakeWordConfigured(),
+        isDeepgramConfigured(),
+      ]);
       if (cancelled) return;
 
-      function gateUtterance(raw: string): string | null {
+      function gate(raw: string): string | null {
         if (mode === "wake") {
           const stripped = extractWakeUtterance(raw);
           return stripped === null ? null : (stripped || "Are you there?");
@@ -42,45 +80,14 @@ export function ContinuousJarvis() {
         return raw;
       }
 
-      async function handleFinal(raw: string) {
-        if (busyRef.current) return;
-        const text = gateUtterance(raw);
-        if (text === null) return;
-        // Cancel any speculative pre-warm in flight — the final wins.
-        inflightAbortRef.current?.abort();
-        inflightAbortRef.current = null;
-
-        busyRef.current = true;
-        setOrbState("thinking");
-        try {
-          const reply = await streamJarvisVoice({ text });
-          window.dispatchEvent(new CustomEvent("cc:jarvis-turn", {
-            detail: { user: text, assistant: reply },
-          }));
-        } catch {
-          speak("Sorry, I lost connection.");
-        } finally {
-          busyRef.current = false;
-          setTimeout(() => {
-            if (getListenMode() !== "off") setOrbState("listening");
-          }, 200);
-        }
-      }
-
       function handlePartial(raw: string) {
-        if (!useDeepgram) return;
         if (busyRef.current) return;
         if (raw.split(/\s+/).length < 4) return;
         const now = Date.now();
         if (now - lastSpecAtRef.current < 500) return;
-        const text = gateUtterance(raw);
+        const text = gate(raw);
         if (text === null) return;
         lastSpecAtRef.current = now;
-
-        // Pre-warm: kick the streaming endpoint with the partial. We don't
-        // pipe its output to TTS (we discard it). Anthropic warms the
-        // connection + the model context, so when handleFinal fires for
-        // real, the actual reply lands faster.
         inflightAbortRef.current?.abort();
         const ac = new AbortController();
         inflightAbortRef.current = ac;
@@ -92,30 +99,66 @@ export function ContinuousJarvis() {
         }).catch(() => {});
       }
 
-      if (useDeepgram) {
+      // Path A: Porcupine wake word (best). On wake, capture one utterance
+      // via Deepgram or Web Speech, run Jarvis, return to wake-listening.
+      if (hasWake && (mode === "wake")) {
+        const wake = await startWakeWordListener(async () => {
+          if (cancelled || busyRef.current) return;
+          setOrbState("listening");
+          if (hasDg) {
+            const dg = await listenWithDeepgram({
+              onPartial: () => { /* we already woke; partials are noise here */ },
+              onFinal: (raw) => {
+                if (raw) runJarvis(raw);
+                dg?.stop();
+              },
+              onError: () => { /* swallow */ },
+              onClose: () => { /* swallow */ },
+            });
+            // Auto-close the burst after 8s in case the user never finishes.
+            setTimeout(() => { try { dg?.stop(); } catch { /* ignore */ } }, 8000);
+          } else {
+            listenOnce({
+              onResult: (t) => { if (t) runJarvis(t); },
+              onError: () => { /* swallow */ },
+              onEnd:   () => { /* swallow */ },
+            });
+          }
+        });
+        if (wake) { stopFns.current.push(() => wake.stop()); return; }
+        // Porcupine failed to start — fall through to streaming STT path.
+      }
+
+      // Path B: Deepgram continuous (no wake word, or "always" mode).
+      if (hasDg) {
         const dg = await listenWithDeepgram({
           onPartial: handlePartial,
-          onFinal:   handleFinal,
-          onError:   (e) => console.warn("[deepgram]", e),
-        });
-        if (dg) stopRef.current = dg;
-        else {
-          stopRef.current = listenContinuous({
-            onUtterance: handleFinal,
-            onError: (e) => console.warn("[webspeech]", e),
-          });
-        }
-      } else {
-        stopRef.current = listenContinuous({
-          onUtterance: handleFinal,
-          onError: (e) => {
-            if (e === "not-allowed" || e === "service-not-allowed") {
-              console.warn("[jarvis] mic permission denied");
-              setOrbState("idle");
-            }
+          onFinal:   (raw) => {
+            const text = gate(raw);
+            if (text !== null) runJarvis(text);
           },
+          onError: (e) => console.warn("[deepgram]", e),
         });
+        if (dg) {
+          stopFns.current.push(() => dg.stop());
+          return;
+        }
       }
+
+      // Path C: Web Speech fallback.
+      const stop = listenContinuous({
+        onUtterance: (raw) => {
+          const text = gate(raw);
+          if (text !== null) runJarvis(text);
+        },
+        onError: (e) => {
+          if (e === "not-allowed" || e === "service-not-allowed") {
+            console.warn("[jarvis] mic permission denied");
+            setOrbState("idle");
+          }
+        },
+      });
+      if (stop) stopFns.current.push(() => stop.stop());
     }
 
     start();
@@ -123,7 +166,7 @@ export function ContinuousJarvis() {
     return () => {
       cancelled = true;
       window.removeEventListener("cc:listen-changed", start);
-      stopRef.current?.stop();
+      stopAll();
       inflightAbortRef.current?.abort();
     };
   }, []);
