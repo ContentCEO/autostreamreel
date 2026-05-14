@@ -19,12 +19,17 @@ pub fn run() {
                 .title("Control Center")
                 .inner_size(1600.0, 1000.0)
                 .min_inner_size(1280.0, 800.0)
-                .fullscreen(true)
                 .decorations(false)
                 .user_agent("ControlCenter/0.1.0 (Tauri Desktop)")
+                .visible(true)
                 .build()?;
 
-            let _ = window.set_fullscreen(true);
+            // Try native fullscreen; if the platform refuses, fall back to
+            // maximized borderless. Either way the desktop is taken over.
+            if window.set_fullscreen(true).is_err() {
+                let _ = window.maximize();
+            }
+            let _ = window.set_focus();
             Ok(())
         })
         .run(tauri::generate_context!())

@@ -8,21 +8,7 @@
     "devUrl": "http://localhost:3000"
   },
   "app": {
-    "windows": [
-      {
-        "title": "Control Center",
-        "width": 1600,
-        "height": 1000,
-        "minWidth": 1280,
-        "minHeight": 800,
-        "resizable": true,
-        "fullscreen": true,
-        "decorations": false,
-        "alwaysOnTop": false,
-        "transparent": false,
-        "userAgent": "ControlCenter/0.1.0 (Tauri Desktop)"
-      }
-    ],
+    "windows": [],
     "security": { "csp": null }
   },
   "bundle": {
