@@ -19,6 +19,7 @@ import {
   Workflow,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { GoogleConnect } from "@/components/GoogleConnect";
 
 import type { LucideIcon } from "lucide-react";
 
@@ -160,8 +161,9 @@ export function Sidebar({ email }: { email: string | null }) {
         ))}
       </nav>
 
-      <div className="border-t border-ink-800 p-3 text-xs text-ink-400">
-        <div className="truncate mb-2">{email}</div>
+      <div className="border-t border-ink-800 p-3 text-xs text-ink-400 space-y-2">
+        <GoogleConnect />
+        <div className="truncate">{email}</div>
         <form action="/auth/signout" method="post">
           <button className="flex items-center gap-2 hover:text-ink-200">
             <LogOut size={14} /> Sign out
