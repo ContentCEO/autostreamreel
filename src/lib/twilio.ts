@@ -18,6 +18,12 @@ export function isTwilioConfigured(): boolean {
   return Boolean(getConfig());
 }
 
+export function getOwnerPhone(): string | null {
+  return process.env.OWNER_PHONE && process.env.OWNER_PHONE.trim() !== ""
+    ? process.env.OWNER_PHONE.trim()
+    : null;
+}
+
 function authHeader(cfg: TwilioConfig): string {
   const raw = `${cfg.accountSid}:${cfg.authToken}`;
   const b64 = Buffer.from(raw, "utf8").toString("base64");

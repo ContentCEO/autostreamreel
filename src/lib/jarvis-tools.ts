@@ -5,6 +5,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { isAllowed } from "@/lib/permissions";
 import { sendOutboundRow } from "@/lib/outbound";
+import { createAlert as createAlertHelper } from "@/lib/alerts";
 
 export const JARVIS_TOOLS = [
   // ---- read ----
@@ -332,13 +333,13 @@ export async function runJarvisTool(
       return result;
     }
     case "create_alert": {
-      const { data, error } = await admin.from("alerts").insert({
+      const result = await createAlertHelper(admin, {
         title:       String(input.title),
-        body:        input.body ?? null,
-        severity:    input.severity ?? "info",
-        business_id: input.business_id ?? null,
-      }).select("id").single();
-      return error ? { error: error.message } : { id: data?.id };
+        body:        input.body as string | null | undefined,
+        severity:    input.severity as "info" | "warn" | "critical" | undefined,
+        business_id: input.business_id as string | null | undefined,
+      });
+      return result;
     }
     case "resolve_alert": {
       const { error } = await admin.from("alerts")

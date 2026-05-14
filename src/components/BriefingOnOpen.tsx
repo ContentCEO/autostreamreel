@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Sparkles, X, RefreshCw } from "lucide-react";
+import { Sparkles, X, RefreshCw, Volume2 } from "lucide-react";
+import { speak, cancelSpeech, isVoiceEnabled } from "@/lib/speech";
 
 // Auto-fires on first paint of the Command Center. Pulls the latest briefing,
 // or generates a fresh one if stale. Dismissible — won't re-open until next
-// /cc visit.
+// /cc visit. Speaks the briefing aloud the first time it shows in a session.
 export function BriefingOnOpen() {
   const [body, setBody] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -21,11 +22,19 @@ export function BriefingOnOpen() {
         if (j.body) {
           setBody(j.body);
           setOpen(true);
+          // Welcome moment — speak the briefing if voice is on. The first
+          // utterance after page load may need a user gesture in Safari;
+          // the briefing modal counts as one if they click anywhere.
+          if (isVoiceEnabled()) {
+            // Greet, then read the briefing.
+            speak(`Welcome back. Here's your briefing. ${j.body}`);
+          }
         }
       } catch {
         /* offline — silently skip */
       }
     })();
+    return () => cancelSpeech();
   }, []);
 
   async function refresh() {
@@ -33,12 +42,20 @@ export function BriefingOnOpen() {
     try {
       const r = await fetch("/api/briefing", { method: "POST" });
       const j = await r.json();
-      if (j.body) setBody(j.body);
+      if (j.body) {
+        setBody(j.body);
+        speak(j.body);
+      }
     } finally { setRefreshing(false); }
+  }
+
+  function readAloud() {
+    if (body) speak(body);
   }
 
   function dismiss() {
     sessionStorage.setItem("cc_briefing_dismissed", "1");
+    cancelSpeech();
     setOpen(false);
   }
 
@@ -53,6 +70,9 @@ export function BriefingOnOpen() {
             <h2 className="text-lg font-semibold">Briefing</h2>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={readAloud} className="btn-ghost text-xs flex items-center gap-1">
+              <Volume2 size={12} /> Read aloud
+            </button>
             <button onClick={refresh} disabled={refreshing} className="btn-ghost text-xs flex items-center gap-1">
               <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
               {refreshing ? "Regenerating…" : "Refresh"}

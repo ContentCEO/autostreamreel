@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertOctagon } from "lucide-react";
+import { speak, cancelSpeech } from "@/lib/speech";
 
 interface CriticalAlert {
   id: string;
@@ -12,10 +13,13 @@ interface CriticalAlert {
 
 // Hard takeover when an unresolved CRITICAL alert exists. Polls /api/status to
 // detect, then fetches details. The owner cannot keep working until they
-// acknowledge — drives the "Jarvis interrupts you" UX.
+// acknowledge — drives the "Jarvis interrupts you" UX. Speaks the alert
+// aloud the first time it's seen in this session, plus optionally places a
+// phone call via the existing alerts/[id]/call endpoint.
 export function CriticalTakeover() {
   const [alert, setAlert] = useState<CriticalAlert | null>(null);
   const [busy, setBusy] = useState(false);
+  const [spokenIds, setSpokenIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -28,8 +32,16 @@ export function CriticalTakeover() {
     }
     check();
     const t = setInterval(check, 20_000);
-    return () => { cancelled = true; clearInterval(t); };
+    return () => { cancelled = true; clearInterval(t); cancelSpeech(); };
   }, []);
+
+  // Speak each new critical alert exactly once per session.
+  useEffect(() => {
+    if (!alert) return;
+    if (spokenIds.has(alert.id)) return;
+    speak(`Critical alert. ${alert.title}. ${alert.body ?? ""}`);
+    setSpokenIds((s) => new Set(s).add(alert.id));
+  }, [alert, spokenIds]);
 
   async function resolve() {
     if (!alert) return;
@@ -40,6 +52,7 @@ export function CriticalTakeover() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: alert.id }),
       });
+      cancelSpeech();
       setAlert(null);
     } finally { setBusy(false); }
   }

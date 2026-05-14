@@ -4,6 +4,7 @@ import { formatCents, relativeTime } from "@/lib/utils";
 import { LEAD_STATUS_LABEL } from "@/lib/types";
 import { QuickAdd } from "@/components/QuickAdd";
 import { RowOutbound } from "@/components/RowOutbound";
+import { ContractorFlowSync } from "@/components/ContractorFlowSync";
 import { listPermissions } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +27,7 @@ export default async function LeadsPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-2xl font-semibold">Leads</h1>
+      <ContractorFlowSync businesses={businesses ?? []} />
       <QuickAdd
         title="Add lead"
         endpoint="/api/leads"

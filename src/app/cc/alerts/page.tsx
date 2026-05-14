@@ -30,7 +30,7 @@ export default async function AlertsPage() {
                 <div className="flex items-center gap-2 text-xs shrink-0">
                   <span className={a.severity === "critical" ? "badge bg-danger-500/20 text-danger-500" : a.severity === "warn" ? "badge bg-warn-500/20 text-warn-500" : "badge bg-ink-700 text-ink-300"}>{a.severity}</span>
                   <span className="text-ink-500">{relativeTime(a.created_at)}</span>
-                  <AlertRowActions id={a.id} resolved={Boolean(a.resolved_at)} />
+                  <AlertRowActions id={a.id} resolved={Boolean(a.resolved_at)} severity={a.severity} />
                 </div>
               </div>
             </li>

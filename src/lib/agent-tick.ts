@@ -11,6 +11,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { generateText } from "@/lib/ai";
 import { isAllowed } from "@/lib/permissions";
+import { createAlert } from "@/lib/alerts";
 
 type Tier = "ceo" | "manager" | "assistant_manager" | "employee";
 
@@ -99,7 +100,7 @@ export async function runAutonomousTick(
 
     if (/BLOCKER:/i.test(text)) {
       const line = text.split("\n").find((l) => /BLOCKER:/i.test(l)) ?? text;
-      await admin.from("alerts").insert({
+      await createAlert(admin, {
         business_id: agent.business_id,
         agent_id:    agent.id,
         severity:    agent.tier === "ceo" || agent.tier === "manager" ? "warn" : "info",
