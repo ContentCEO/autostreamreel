@@ -1,34 +1,22 @@
 {
-  "name": "control-center",
-  "version": "1.2.0",
+  "name": "agentos",
+  "version": "0.1.0",
   "private": true,
-  "description": "Personal command center — your own Jarvis for running multiple businesses.",
+  "description": "AgentOS — 16 specialist agents for marketing + operations.",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
-    "@picovoice/porcupine-web": "^3.0.3",
-    "@picovoice/web-voice-processor": "^4.0.9",
-    "@supabase/ssr": "^0.5.2",
-    "@supabase/supabase-js": "^2.45.4",
-    "@tauri-apps/api": "^2.1.1",
-    "clsx": "^2.1.1",
-    "date-fns": "^3.6.0",
-    "lucide-react": "^0.460.0",
     "next": "14.2.15",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.1.0",
     "@types/node": "^20.16.10",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.0",
